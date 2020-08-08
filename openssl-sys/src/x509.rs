@@ -382,6 +382,27 @@ cfg_if! {
         }
     }
 }
+cfg_if! {
+    if #[cfg(any(ossl110, libressl280))] {
+        extern "C" {
+            pub fn X509V3_get_d2i(
+                x: *const stack_st_X509_EXTENSION,
+                nid: c_int,
+                crit: *mut c_int,
+                idx: *mut c_int,
+            ) -> *mut c_void;
+        }
+    } else {
+        extern "C" {
+            pub fn X509V3_get_d2i(
+                x: *mut stack_st_X509_EXTENSION,
+                nid: c_int,
+                crit: *mut c_int,
+                idx: *mut c_int,
+            ) -> *mut c_void;
+        }
+    }
+}
 
 extern "C" {
     pub fn X509_verify_cert(ctx: *mut X509_STORE_CTX) -> c_int;
