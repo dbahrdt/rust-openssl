@@ -36,8 +36,11 @@ use {cvt, cvt_n, cvt_p};
 #[cfg(any(ossl102, libressl261))]
 pub mod verify;
 
+mod ext_decode;
 pub mod extension;
 pub mod store;
+
+pub use self::ext_decode::X509ExtensionContainer;
 
 #[cfg(test)]
 mod tests;
@@ -417,19 +420,7 @@ impl X509Ref {
     ///
     /// [`X509_get_ext_d2i`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_get_ext_d2i.html
     pub fn subject_alt_names(&self) -> Option<Stack<GeneralName>> {
-        unsafe {
-            let stack = ffi::X509_get_ext_d2i(
-                self.as_ptr(),
-                ffi::NID_subject_alt_name,
-                ptr::null_mut(),
-                ptr::null_mut(),
-            );
-            if stack.is_null() {
-                None
-            } else {
-                Some(Stack::from_ptr(stack as *mut _))
-            }
-        }
+        Some(X509ExtensionContainer::subject_alt_names(self).unwrap_or(None)?.0)
     }
 
     /// Returns this certificate's issuer alternative name entries, if they exist.
@@ -438,19 +429,7 @@ impl X509Ref {
     ///
     /// [`X509_get_ext_d2i`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_get_ext_d2i.html
     pub fn issuer_alt_names(&self) -> Option<Stack<GeneralName>> {
-        unsafe {
-            let stack = ffi::X509_get_ext_d2i(
-                self.as_ptr(),
-                ffi::NID_issuer_alt_name,
-                ptr::null_mut(),
-                ptr::null_mut(),
-            );
-            if stack.is_null() {
-                None
-            } else {
-                Some(Stack::from_ptr(stack as *mut _))
-            }
-        }
+        Some(X509ExtensionContainer::issuer_alt_names(self).unwrap_or(None)?.0)
     }
 
     pub fn public_key(&self) -> Result<PKey<Public>, ErrorStack> {
@@ -685,7 +664,7 @@ impl fmt::Debug for X509 {
         debug_struct.field("signature_algorithm", &self.signature_algorithm().object());
         debug_struct.field("issuer", &self.issuer_name());
         debug_struct.field("subject", &self.subject_name());
-        if let Some(subject_alt_names) = &self.subject_alt_names() {
+        if let Ok(Some((subject_alt_names, _))) = &self.subject_alt_names() {
             debug_struct.field("subject_alt_names", subject_alt_names);
         }
         debug_struct.field("not_before", &self.not_before());
