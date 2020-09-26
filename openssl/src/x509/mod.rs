@@ -37,6 +37,7 @@ use {cvt, cvt_n, cvt_p};
 pub mod verify;
 
 pub mod extension;
+pub mod extension_raw;
 pub mod store;
 
 #[cfg(test)]
@@ -789,6 +790,22 @@ impl X509Extension {
             let value = value.as_ptr() as *mut _;
 
             cvt_p(ffi::X509V3_EXT_nconf_nid(conf, context, name, value)).map(X509Extension)
+        }
+    }
+
+    /// Create extension from native type
+    pub fn new_typed<E: extension_raw::ExtensionMark>(
+        data: &<E::Data as ForeignType>::Ref,
+        crit: bool,
+    ) -> Result<Self, ErrorStack> {
+        let crit = if crit { 1 } else { 0 };
+        unsafe {
+            cvt_p(ffi::X509V3_EXT_i2d(
+                E::NID.as_raw(),
+                crit,
+                data.as_ptr() as *mut _,
+            ))
+            .map(X509Extension)
         }
     }
 }
