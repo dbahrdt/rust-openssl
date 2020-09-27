@@ -1,6 +1,7 @@
 mod known_extensions;
 mod raw_x509;
 mod raw_x509_exts_stack;
+mod raw_x509_revoked;
 mod sealed;
 mod traits;
 

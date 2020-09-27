@@ -1540,3 +1540,110 @@ cfg_if! {
         }
     }
 }
+
+foreign_type_and_impl_send_sync! {
+    type CType = ffi::X509_REVOKED;
+    fn drop = ffi::X509_REVOKED_free;
+
+    /// An X509 certificate revocation.
+    pub struct X509Revoked;
+    /// Reference to `X509Revoked`
+    pub struct X509RevokedRef;
+}
+
+impl Stackable for X509Revoked {
+    type StackType = ffi::stack_st_X509_REVOKED;
+}
+
+impl X509Revoked {
+    /// Create new (empty) revocation
+    pub fn new_empty() -> Result<Self, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_REVOKED_new()).map(Self)
+        }
+    }
+
+    from_der! {
+        /// Deserializes a DER-encoded X509 certificate revocation.
+        ///
+        /// This corresponds to [`d2i_X509_REVOKED`].
+        ///
+        /// [`d2i_X509_REVOKED`]: https://www.openssl.org/docs/man1.1.0/man3/d2i_X509_REVOKED.html
+        from_der,
+        X509Revoked,
+        ffi::d2i_X509_REVOKED
+    }
+}
+
+impl X509RevokedRef {
+    /// Get serial number of revoked certificate
+    pub fn serial_number(&self) -> &Asn1IntegerRef {
+        unsafe { Asn1IntegerRef::from_ptr(X509_REVOKED_get0_serialNumber(self.as_ptr()) as *mut _) }
+    }
+
+    /// Set serial number of revoked certificate
+    pub fn set_serial_number(&mut self, serial: &Asn1IntegerRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_serialNumber(
+                self.as_ptr(),
+                serial.as_ptr(),
+            ))?;
+        }
+        Ok(())
+    }
+
+    /// Get when certificate was revoked
+    pub fn revocation_date(&self) -> &Asn1TimeRef {
+        unsafe { Asn1TimeRef::from_ptr(X509_REVOKED_get0_revocationDate(self.as_ptr()) as *mut _) }
+    }
+
+    /// Set when certificate was revoked
+    pub fn set_revocation_date(&mut self, tm: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_REVOKED_set_revocationDate(
+                self.as_ptr(),
+                tm.as_ptr(),
+            ))?;
+        }
+        Ok(())
+    }
+
+    /// Get extensions for revocation
+    pub fn extensions(&self) -> &StackRef<X509Extension> {
+        unsafe { StackRef::from_ptr(X509_REVOKED_get0_extensions(self.as_ptr()) as *mut _) }
+    }
+
+    to_der! {
+        /// Serializes the revocation into a DER-encoded X509 revocation structure.
+        ///
+        /// This corresponds to [`i2d_X509_REVOKED`].
+        ///
+        /// [`i2d_X509_REVOKED`]: https://www.openssl.org/docs/man1.1.0/crypto/i2d_X509_REVOKED.html
+        to_der,
+        ffi::i2d_X509_REVOKED
+    }
+}
+
+cfg_if! {
+    if #[cfg(any(ossl110, libressl270))] {
+        use ffi::{
+            X509_REVOKED_get0_serialNumber,
+            X509_REVOKED_get0_revocationDate,
+            X509_REVOKED_get0_extensions,
+        };
+    } else {
+        #[allow(bad_style)]
+        unsafe fn X509_REVOKED_get0_serialNumber(r: *const ffi::X509_REVOKED) -> *const ffi::ASN1_INTEGER {
+            (*r).serialNumber
+        }
+        #[allow(bad_style)]
+        unsafe fn X509_REVOKED_get0_revocationDate(r: *const ffi::X509_REVOKED) -> *const ffi::ASN1_TIME {
+            (*r).revocationDate
+        }
+        #[allow(bad_style)]
+        unsafe fn X509_REVOKED_get0_extensions(r: *const ffi::X509_REVOKED) -> *const ffi::stack_st_X509_EXTENSION {
+            (*r).extensions
+        }
+    }
+}
