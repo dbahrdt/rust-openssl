@@ -7,7 +7,7 @@ mod sealed;
 mod traits;
 
 pub use self::{
-    known_extensions::{ExtIssuerAltName, ExtSubjectAltName},
+    known_extensions::{ExtExtKeyUsage, ExtIssuerAltName, ExtSubjectAltName},
     traits::{
         ExtensionAccess, ExtensionMark, ExtensionsDataIterator, ExtensionsIterator,
         ExtensionsIteratorByCritical, ExtensionsIteratorByNid, ExtensionsIteratorByObj,

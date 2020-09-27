@@ -12,6 +12,8 @@ pub enum ASN1_TYPE {}
 pub enum ASN1_OBJECT {}
 pub enum ASN1_OCTET_STRING {}
 
+stack!(stack_st_ASN1_OBJECT);
+
 pub enum bio_st {} // FIXME remove
 cfg_if! {
     if #[cfg(any(ossl110, libressl280))] {

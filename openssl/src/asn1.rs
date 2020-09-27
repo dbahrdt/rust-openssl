@@ -39,6 +39,7 @@ use bio::MemBio;
 use bn::{BigNum, BigNumRef};
 use error::ErrorStack;
 use nid::Nid;
+use stack::Stackable;
 use string::OpensslString;
 use {cvt, cvt_p};
 
@@ -535,6 +536,10 @@ foreign_type_and_impl_send_sync! {
     ///
     /// [`Asn1Object`]: struct.Asn1Object.html
     pub struct Asn1ObjectRef;
+}
+
+impl Stackable for Asn1Object {
+    type StackType = ffi::stack_st_ASN1_OBJECT;
 }
 
 impl Asn1Object {

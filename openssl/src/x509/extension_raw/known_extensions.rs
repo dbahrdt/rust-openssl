@@ -1,3 +1,4 @@
+use asn1::Asn1Object;
 use nid::Nid;
 use stack::Stack;
 use x509::GeneralName;
@@ -16,4 +17,12 @@ pub struct ExtIssuerAltName;
 unsafe impl ExtensionMark for ExtIssuerAltName {
     type Data = Stack<GeneralName>;
     const NID: Nid = Nid::ISSUER_ALT_NAME;
+}
+
+/// Marker type to decode `ExtKeyUsage`
+pub struct ExtExtKeyUsage;
+unsafe impl ExtensionMark for ExtExtKeyUsage {
+    // typedef STACK_OF(ASN1_OBJECT) EXTENDED_KEY_USAGE;
+    type Data = Stack<Asn1Object>;
+    const NID: Nid = Nid::EXT_KEY_USAGE;
 }
