@@ -368,7 +368,6 @@ impl X509Builder {
     {
         unsafe { cvt(ffi::X509_sign(self.0.as_ptr(), key.as_ptr(), hash.as_ptr())).map(|_| ()) }
     }
-
     /// Consumes the builder, returning the certificate.
     pub fn build(self) -> X509 {
         self.0
@@ -1700,6 +1699,11 @@ impl Stackable for X509Crl {
 }
 
 impl X509Crl {
+    /// Returns a new builder.
+    pub fn builder() -> Result<X509CrlBuilder, ErrorStack> {
+        X509CrlBuilder::new()
+    }
+
     from_pem! {
         /// Deserializes a PEM-encoded X509 certificate revocation list structure.
         ///
@@ -1853,7 +1857,7 @@ impl X509CrlRef {
     /// This corresponds to [`X509_CRL_get_issuer"].
     ///
     /// [`X509_CRL_get_issuer`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_get_issuer.html
-    pub fn issuer(&self) -> &X509NameRef {
+    pub fn issuer_name(&self) -> &X509NameRef {
         unsafe {
             let issuer = X509_CRL_get_issuer(self.as_ptr());
             assert!(
@@ -1912,5 +1916,168 @@ cfg_if! {
         unsafe fn X509_CRL_get_issuer(crl: *const X509_CRL) -> *mut X509_NAME {
             (*crl).issuer
         }
+    }
+}
+
+pub struct X509CrlBuilder(X509Crl);
+
+impl X509CrlBuilder {
+    pub fn new() -> Result<Self, ErrorStack> {
+        unsafe {
+            ffi::init();
+            cvt_p(ffi::X509_CRL_new()).map(X509Crl).map(X509CrlBuilder)
+        }
+    }
+
+    /// Signs the CRL with a private key.
+    pub fn sign<T>(&mut self, key: &PKeyRef<T>, hash: MessageDigest) -> Result<(), ErrorStack>
+    where
+        T: HasPrivate,
+    {
+        unsafe {
+            cvt(ffi::X509_CRL_sign(
+                self.0.as_ptr(),
+                key.as_ptr(),
+                hash.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Consumes the builder, returning the CRL.
+    pub fn build(self) -> X509Crl {
+        self.0
+    }
+
+    /// Sets the version of the CRL.
+    ///
+    /// Note that the version is zero-indexed; that is, a CRL corresponding to version 2 of
+    /// the X.509 standard should pass `1` to this method.
+    ///
+    /// This corresponds to [`X509_CRL_set_version"].
+    ///
+    /// [`X509_CRL_set_version`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_set_version.html
+    pub fn set_version(&mut self, version: i32) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_set_version(self.0.as_ptr(), version.into())).map(|_| ()) }
+    }
+
+    /// Sets the issuer name of the certificate.
+    ///
+    /// This corresponds to [`X509_CRL_set_issuer_name"].
+    ///
+    /// [`X509_CRL_set_issuer_name`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_set_issuer_name.html
+    pub fn set_issuer_name(&mut self, issuer_name: &X509NameRef) -> Result<(), ErrorStack> {
+        unsafe {
+            cvt(ffi::X509_CRL_set_issuer_name(
+                self.0.as_ptr(),
+                issuer_name.as_ptr(),
+            ))
+            .map(|_| ())
+        }
+    }
+
+    /// Sort the revoked entries into ascending serial number order
+    ///
+    /// This corresponds to [`X509_CRL_sort"].
+    ///
+    /// [`X509_CRL_sort`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_sort.html
+    pub fn sort(&mut self) -> Result<(), ErrorStack> {
+        unsafe { cvt(ffi::X509_CRL_sort(self.0.as_ptr())).map(|_| ()) }
+    }
+
+    /// Add revocation entry to list.
+    ///
+    /// This corresponds to [`X509_CRL_add0_revoked"].
+    ///
+    /// [`X509_CRL_add0_revoked`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_add0_revoked.html
+    pub fn add_revoked(&mut self, rev: X509Revoked) -> Result<(), ErrorStack> {
+        // on success the revoked entry is owned by the CRL
+        let rev = mem::ManuallyDrop::new(rev);
+        let result = unsafe { cvt(ffi::X509_CRL_add0_revoked(self.0.as_ptr(), rev.as_ptr())) };
+        match result {
+            Err(e) => {
+                // failed to add; drop entry here (sadly not documented)
+                mem::ManuallyDrop::into_inner(rev);
+                Err(e)
+            }
+            Ok(_) => Ok(()),
+        }
+    }
+
+    /// Set time of signing
+    ///
+    /// This corresponds to [`X509_CRL_set1_lastUpdate"].
+    ///
+    /// [`X509_CRL_set1_lastUpdate`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_set1_lastUpdate.html
+    pub fn set_last_update(&mut self, tm: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(X509_CRL_set1_lastUpdate(self.0.as_ptr(), tm.as_ptr())).map(|_| ()) }
+    }
+
+    /// Set time next update must be available (i.e. "valid until")
+    ///
+    /// This corresponds to [`X509_CRL_set1_nextUpdate"].
+    ///
+    /// [`X509_CRL_set1_nextUpdate`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_set1_nextUpdate.html
+    pub fn set_next_update(&mut self, tm: &Asn1TimeRef) -> Result<(), ErrorStack> {
+        unsafe { cvt(X509_CRL_set1_nextUpdate(self.0.as_ptr(), tm.as_ptr())).map(|_| ()) }
+    }
+
+    /// Get (mutable) revocation entries
+    ///
+    /// This corresponds to [`X509_CRL_get_REVOKED"].
+    ///
+    /// [`X509_CRL_get_REVOKED`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_get_REVOKED.html
+    pub fn revoked(&mut self) -> Option<&mut StackRef<X509Revoked>> {
+        unsafe {
+            let revoked = X509_CRL_get_REVOKED(self.0.as_ptr());
+            if revoked.is_null() {
+                None
+            } else {
+                Some(StackRef::from_ptr_mut(revoked))
+            }
+        }
+    }
+
+    /// Get the time the next update is required (i.e. "valid until")
+    ///
+    /// This corresponds to [`X509_CRL_get0_nextUpdate"].
+    ///
+    /// [`X509_CRL_get0_nextUpdate`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_get0_nextUpdate.html
+    pub fn next_update(&self) -> Option<&Asn1TimeRef> {
+        self.0.next_update()
+    }
+
+    /// Get the time the CRL was signed.
+    ///
+    /// This corresponds to [`X509_CRL_get0_lastUpdate"].
+    ///
+    /// [`X509_CRL_get0_lastUpdate`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_get0_lastUpdate.html
+    pub fn last_update(&self) -> &Asn1TimeRef {
+        self.0.last_update()
+    }
+
+    /// Get the issuer name
+    ///
+    /// Identifies the certificate used to sign the CRL.
+    ///
+    /// This corresponds to [`X509_CRL_get_issuer"].
+    ///
+    /// [`X509_CRL_get_issuer`]: https://www.openssl.org/docs/man1.1.0/crypto/X509_CRL_get_issuer.html
+    pub fn issuer_name(&self) -> &X509NameRef {
+        self.0.issuer_name()
+    }
+}
+
+cfg_if! {
+    if #[cfg(any(ossl110, libressl270))] {
+        use ffi::{
+            X509_CRL_set1_lastUpdate,
+            X509_CRL_set1_nextUpdate,
+        };
+    } else {
+        use ffi::{
+            X509_CRL_set_lastUpdate as X509_CRL_set1_lastUpdate,
+            X509_CRL_set_nextUpdate as X509_CRL_set1_nextUpdate,
+        };
     }
 }
