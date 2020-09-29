@@ -137,5 +137,6 @@ fn main() {
         }
     });
     cfg.fn_cname(|rust, link_name| link_name.unwrap_or(rust).to_string());
+    cfg.out_items("items.h");
     cfg.generate("../openssl-sys/src/lib.rs", "all.rs");
 }

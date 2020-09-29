@@ -8,7 +8,8 @@ libc = "0.2"
 openssl-sys = { path = "../openssl-sys" }
 
 [build-dependencies]
-ctest = "0.2"
+# ctest = "0.2"
+ctest = { git = "https://github.com/stbuehler/ctest", rev = "453139e37865c4712e55d368b3209e46e10fddd2" }
 
 [features]
 vendored = ['openssl-sys/vendored']
