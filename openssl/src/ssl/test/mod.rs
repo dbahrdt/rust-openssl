@@ -555,6 +555,7 @@ fn read_panic() {
 
 #[test]
 #[should_panic(expected = "blammo")]
+#[cfg_attr(libressl320, ignore)] // FIXME: libressl 3.2.x doesn't flush with TLS1.3
 fn flush_panic() {
     struct ExplodingStream(TcpStream);
 
@@ -841,6 +842,7 @@ fn cert_store() {
 }
 
 #[test]
+#[cfg_attr(libressl320, ignore)] // FIXME: libressl 3.2.x doesn't run callbacks with TLS1.3
 fn tmp_dh_callback() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -887,6 +889,7 @@ fn tmp_ecdh_callback() {
 }
 
 #[test]
+#[cfg_attr(libressl320, ignore)] // FIXME: libressl 3.2.x doesn't run callbacks with TLS1.3
 fn tmp_dh_callback_ssl() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -951,9 +954,16 @@ fn active_session() {
 
     let session = s.ssl().session().unwrap();
     let len = session.master_key_len();
-    let mut buf = vec![0; len - 1];
-    let copied = session.master_key(&mut buf);
-    assert_eq!(copied, buf.len());
+    if cfg!(not(libressl320)) {
+        // FIXME: libressl reports empty master key for TLS1.3 connections
+        // (but it does work with openssl and TLS1.3)
+        assert!(len > 0, "master key must not be empty");
+    }
+    if len > 0 {
+        let mut buf = vec![0; len - 1];
+        let copied = session.master_key(&mut buf);
+        assert_eq!(copied, buf.len());
+    }
     let mut buf = vec![0; len + 1];
     let copied = session.master_key(&mut buf);
     assert_eq!(copied, len);
@@ -999,6 +1009,7 @@ fn status_callbacks() {
 }
 
 #[test]
+#[cfg_attr(libressl320, ignore)] // FIXME: libressl 3.2.x doesn't run callbacks with TLS1.3
 fn new_session_callback() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -1022,6 +1033,7 @@ fn new_session_callback() {
 }
 
 #[test]
+#[cfg_attr(libressl320, ignore)] // FIXME: libressl 3.2.x doesn't run callbacks with TLS1.3 it seems
 fn new_session_callback_swapped_ctx() {
     static CALLED_BACK: AtomicBool = AtomicBool::new(false);
 
@@ -1050,6 +1062,11 @@ fn new_session_callback_swapped_ctx() {
 }
 
 #[test]
+// FIXME: libressl 3.2.x broken
+// should implement https://tools.ietf.org/html/rfc8446#section-7.5
+// currently uses client_random and server_random, which are not
+// stored when corresponding handshake packets are received.
+#[cfg_attr(libressl320, ignore)]
 fn keying_export() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
